@@ -1,6 +1,7 @@
 {
     "scripts": {
         "sync": "rsync -avzhe ssh --delete --exclude=vendor --exclude=.git --exclude=.idea ./ /Users/vunamhung/AvitaTheme/Github/base-theme/src/vendor/vunamhung/eddsl",
+        "sync2": "rsync -avzhe ssh --delete --exclude=vendor --exclude=.git --exclude=.idea ./ /Users/vunamhung/Geargag/Bitbucket/plugin-boilerplate/src/vendor/vunamhung/eddsl",
         "sync-back": "rsync -avzhe ssh --delete --exclude=vendor --exclude=.git --exclude=.idea /Users/vunamhung/AvitaTheme/Github/base-theme/src/vendor/vunamhung/eddsl/ ."
     }
 }

@@ -2,6 +2,7 @@
 
 namespace vnh;
 
+use stdClass;
 use vnh\contracts\Bootable;
 
 class Plugin_Updater implements Bootable {
@@ -24,12 +25,44 @@ class Plugin_Updater implements Bootable {
 	}
 
 	public function boot() {
-		add_filter('pre_set_site_transient_update_plugins', [$this, 'check_update']);
-		add_filter('plugins_api', [$this, 'plugins_api_filter'], 10, 3);
-		add_action('admin_init', [$this, 'show_changelog']);
+		add_filter('pre_set_site_transient_update_plugins', [$this, 'plugin_update_transient']);
+	}
 
-		remove_action('after_plugin_row_' . $this->plugin_base, 'wp_plugin_update_row');
-		add_action('after_plugin_row_' . $this->plugin_base, [$this, 'show_update_notification'], 10, 2);
+	/**
+	 * Check for Updates at the defined API endpoint and modify the update array.
+	 *
+	 * This function dives into the update API just when WordPress creates its update array,
+	 * then adds a custom API call and injects the custom plugin data retrieved from the API.
+	 * It is reassembled from parts of the native WordPress plugin update code.
+	 * See wp-includes/update.php line 121 for the original wp_update_plugins() function.
+	 *
+	 * @param array $_transient_data Update array build by WordPress.
+	 *
+	 * @return array Modified update array with custom plugin data.
+	 * @uses api_request()
+	 *
+	 */
+	public function plugin_update_transient($_transient_data) {
+		global $pagenow;
+
+		if (!is_object($_transient_data)) {
+			$_transient_data = new stdClass();
+		}
+
+		if ($pagenow === 'plugins.php' && is_multisite()) {
+			return $_transient_data;
+		}
+
+		if (!empty($_transient_data->response) && !empty($_transient_data->response[$this->plugin_base])) {
+			return $_transient_data;
+		}
+
+		if ($this->get_update_data()) {
+			$_transient_data->last_checked = current_time('timestamp');
+			$_transient_data->checked[$this->plugin_base] = $this->get_update_data();
+		}
+
+		return $_transient_data;
 	}
 
 	public function get_update_data() {
@@ -58,10 +91,11 @@ class Plugin_Updater implements Bootable {
 
 			// If the status is 'ok', return the update arguments
 			$update_data['sections'] = maybe_unserialize($update_data['sections']);
+			$update_data['banners'] = maybe_unserialize($update_data['banners']);
 			set_transient($this->response_key, $update_data, HOUR_IN_SECONDS * 12);
 		}
 
-		if (version_compare($this->version, $update_data->new_version, '>=')) {
+		if (version_compare($this->version, $update_data['new_version'], '>=')) {
 			return false;
 		}
 

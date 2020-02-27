@@ -12,18 +12,30 @@ class License_Management implements Initable {
 	public $updater;
 
 	public $license_status;
+	public $license_status_option_name;
+	public $license_status_message;
 
 	public function __construct($args) {
 		$this->args = $args;
 		$this->args['slug'] = $this->get_slug();
 
+		$this->license_status_option_name = $this->args['slug'] . '_license_status';
+		$this->license_status = get_option($this->license_status_option_name);
+		$this->license_status_message = [
+			'empty_key' => esc_html__('The entered license key is not valid.', 'vnh_textdomain'),
+			'invalid' => esc_html__('The entered license key is not valid.', 'vnh_textdomain'),
+			'expired' => esc_html__('Your key has expired and needs to be renewed.', 'vnh_textdomain'),
+			'inactive' => esc_html__('Your license key is valid, but is not active.', 'vnh_textdomain'),
+			'disabled' => esc_html__('Your license key is currently disabled. Please contact support.', 'vnh_textdomain'),
+			'site_inactive' => esc_html__('Your license key is valid, but not active for this site.', 'vnh_textdomain'),
+			'valid' => esc_html__('Your license key is valid and active for this site.', 'vnh_textdomain'),
+		];
+
 		$this->settings = new License_Settings($this);
 
+		$this->args['license_key'] = trim($this->settings->get_option('key'));
 		$this->settings_page = new License_Page($args, $this->settings);
 		$this->updater = $this->get_updater($args, $this->settings);
-		$this->args['license_key'] = trim($this->settings->get_option('key'));
-
-		$this->license_status = $this->get_license_status();
 	}
 
 	public function init() {
@@ -34,34 +46,29 @@ class License_Management implements Initable {
 		}
 	}
 
+	public function check_license() {
+		update_option($this->license_status_option_name, $this->get_license_status());
+	}
+
 	private function get_license_status() {
-		$transient = $this->args['slug'] . '-license-status-response-key';
-		$license_status = get_transient($transient);
-
-		if ($license_status === false) {
-			if (empty($this->args['license_key'])) {
-				return false;
-			}
-
-			$license_data = request($this->args['remote_api_url'], [
-				'body' => [
-					'edd_action' => 'check_license',
-					'license' => $this->args['license_key'],
-					'item_id' => $this->args['item_id'],
-					'url' => home_url('/'),
-				],
-			]);
-
-			if (is_wp_error($license_data)) {
-				set_transient($transient, 'invalid', MINUTE_IN_SECONDS * 30);
-
-				return false;
-			}
-
-			set_transient($transient, $license_data['license'], HOUR_IN_SECONDS * 12);
+		if (empty($this->args['license_key'])) {
+			return 'empty_key';
 		}
 
-		return $license_status;
+		$license_data = request($this->args['remote_api_url'], [
+			'body' => [
+				'edd_action' => 'check_license',
+				'license' => $this->args['license_key'],
+				'item_id' => $this->args['item_id'],
+				'url' => home_url('/'),
+			],
+		]);
+
+		if (is_wp_error($license_data)) {
+			return false;
+		}
+
+		return $license_data['license'];
 	}
 
 	private function get_slug() {
