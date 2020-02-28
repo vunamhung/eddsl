@@ -42,15 +42,14 @@ class License_Settings extends Register_Settings {
 		];
 	}
 
+	public function render() {
+		$this->license->check_license();
+		return parent::render();
+	}
+
 	public function boot() {
 		parent::boot();
-		add_action('admin_init', function () {
-			if (isset($_REQUEST['activate_key']) || isset($_REQUEST['deactivate_key'])) {
-				$this->manage_license_activation();
-			} else {
-				$this->license->check_license();
-			}
-		});
+		add_action('admin_init', [$this, 'license_activation']);
 	}
 
 	public function display_field_license_action($field, $option) {
@@ -71,6 +70,12 @@ class License_Settings extends Register_Settings {
 		}
 
 		echo $output;
+	}
+
+	public function license_activation() {
+		if ((isset($_REQUEST['activate_key']) || isset($_REQUEST['deactivate_key'])) && check_admin_referer($this->nonce(), $this->nonce())) {
+			$this->manage_license_activation();
+		}
 	}
 
 	public function manage_license_activation() {
