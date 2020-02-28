@@ -31,8 +31,8 @@ class License_Page implements Bootable {
 	}
 
 	public function callback() {
-		$html = '<div class="wrap about-wrap theme_info_wrapper">';
-		$html .= '<h1>' . __('Welcome to <strong>License page</strong>', 'vnh_textdomain') . '</h1>';
+		$html = '<div class="wrap">';
+		$html .= '<h3>' . __('Welcome to <strong>License page</strong>', 'vnh_textdomain') . '</h3>';
 		$html .= '<p>' . __('Enter your license to receive auto update', 'vnh_textdomain') . '</p>';
 		$html .= $this->settings;
 		$html .= '</div>';
