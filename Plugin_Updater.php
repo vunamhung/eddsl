@@ -6,22 +6,16 @@ use stdClass;
 use vnh\contracts\Bootable;
 
 class Plugin_Updater implements Bootable {
-	private $license_key;
+	public $args;
 	private $plugin_slug;
-	private $response_key;
 	private $plugin_base;
-	public $remote_api_url;
-	public $item_id;
-	public $version;
+	private $response_key;
 
-	public function __construct($args, License_Settings $settings) {
-		$this->license_key = trim($settings->get_option('key'));
-		$this->plugin_slug = basename($args['plugin_file'], '.php');
-		$this->response_key = $this->plugin_slug . '-update-response';
+	public function __construct($args) {
+		$this->args = $args;
+		$this->plugin_slug = basename($this->args['plugin_file'], '.php');
 		$this->plugin_base = plugin_basename($args['plugin_file']);
-		$this->remote_api_url = $args['remote_api_url'];
-		$this->item_id = $args['item_id'];
-		$this->version = $args['version'];
+		$this->response_key = $this->plugin_slug . '_update_response';
 	}
 
 	public function boot() {
@@ -69,21 +63,21 @@ class Plugin_Updater implements Bootable {
 		$update_data = get_transient($this->response_key);
 
 		if ($update_data === false) {
-			if (empty($this->license_key)) {
+			if (empty($this->args['license_key'])) {
 				return false;
 			}
 
-			$update_data = request($this->remote_api_url, [
+			$update_data = request($this->args['remote_api_url'], [
 				'body' => [
 					'edd_action' => 'get_version',
-					'license' => $this->license_key,
-					'item_id' => $this->item_id,
+					'license' => $this->args['license_key'],
+					'item_id' => $this->args['item_id'],
 				],
 			]);
 
 			// If the response failed, try again in 30 minutes
 			if (is_wp_error($update_data)) {
-				$data['new_version'] = $this->version;
+				$data['new_version'] = $this->args['version'];
 				set_transient($this->response_key, $data, MINUTE_IN_SECONDS * 30);
 
 				return false;
@@ -95,7 +89,7 @@ class Plugin_Updater implements Bootable {
 			set_transient($this->response_key, $update_data, HOUR_IN_SECONDS * 12);
 		}
 
-		if (version_compare($this->version, $update_data['new_version'], '>=')) {
+		if (version_compare($this->args['version'], $update_data['new_version'], '>=')) {
 			return false;
 		}
 
