@@ -4,23 +4,12 @@ namespace vnh;
 
 class License_Settings extends Register_Settings {
 	public $args;
-	public $license_status_message;
 
 	public function __construct($args) {
 		$this->args = $args;
 
 		$this->prefix = isset($args['theme_slug']) ? $args['theme_slug'] : basename($args['plugin_file'], '.php');
 		$this->option_name = 'license';
-
-		$this->license_status_message = [
-			'empty_key' => esc_html__('The entered license key is not valid.', 'vnh_textdomain'),
-			'invalid' => esc_html__('The entered license key is not valid.', 'vnh_textdomain'),
-			'expired' => esc_html__('Your key has expired and needs to be renewed.', 'vnh_textdomain'),
-			'inactive' => esc_html__('Your license key is valid, but is not active.', 'vnh_textdomain'),
-			'disabled' => esc_html__('Your license key is currently disabled. Please contact support.', 'vnh_textdomain'),
-			'site_inactive' => esc_html__('Your license key is valid, but not active for this site.', 'vnh_textdomain'),
-			'valid' => esc_html__('Your license key is valid and active for this site.', 'vnh_textdomain'),
-		];
 	}
 
 	public function register_setting_fields() {
@@ -65,13 +54,13 @@ class License_Settings extends Register_Settings {
 
 	public function check_license() {
 		$options = $this->get_options();
-		$options['status'] = $this->get_license_status();
-		$this->update_option($options);
-	}
 
-	private function get_license_status() {
+		$options['status'] = 'invalid';
+
 		if (empty($this->get_option('key'))) {
-			return 'empty_key';
+			$options['message'] = esc_html__('Empty license.', 'vnh_textdomain');
+			$this->update_option($options);
+			return;
 		}
 
 		$license_data = request($this->args['remote_api_url'], [
@@ -84,10 +73,61 @@ class License_Settings extends Register_Settings {
 		]);
 
 		if (is_wp_error($license_data)) {
-			return false;
+			$options['message'] = esc_html__('An error occurred, please try again.', 'vnh_textdomain');
+			$this->update_option($options);
+			return;
 		}
 
-		return $license_data['license'];
+		if ($license_data['success']) {
+			switch ($license_data['license']) {
+				case 'expired':
+					$message = sprintf(
+						esc_html__('Your license key expired on %s. ', 'vnh_textdomain') . $this->get_renewal_link(),
+						date_i18n(get_option('date_format'), strtotime($license_data['expires'], current_time('timestamp')))
+					);
+					break;
+
+				case 'disabled':
+				case 'revoked':
+					$message = esc_html__('Your license key has been disabled.', 'vnh_textdomain');
+					break;
+
+				case 'missing':
+					$message = esc_html__('Invalid license.', 'vnh_textdomain');
+					break;
+
+				case 'invalid':
+				case 'site_inactive':
+					$message = esc_html__('Your license is not active for this URL.', 'vnh_textdomain');
+					break;
+
+				case 'item_name_mismatch':
+					$message = sprintf(esc_html__('This appears to be an invalid license key for %s.', 'vnh_textdomain'), $this->args['item_id']);
+					break;
+
+				case 'no_activations_left':
+					$message = esc_html__('Your license key has reached its activation limit.', 'vnh_textdomain');
+					break;
+
+				default:
+					$message = esc_html__('Your license key is valid and active for this site.', 'vnh_textdomain');
+					break;
+			}
+
+			$options['message'] = $message;
+		} else {
+			$options['message'] = esc_html__('Invalid license.', 'vnh_textdomain');
+		}
+
+		$options['status'] = $license_data['license'];
+		$this->update_option($options);
+	}
+
+	public function get_renewal_link() {
+		$checkout_url = $this->args['remote_api_url'] . '/checkout';
+		$renewal_url = add_query_arg(['edd_license_key' => $this->get_option('key'), 'download_id' => $this->args['item_id']], $checkout_url);
+
+		return sprintf('<a href="%s" target="_blank">%s</a>', $renewal_url, __('Renew it now.', 'vnh_textdomain'));
 	}
 
 	public function display_field_license_action($field, $option) {
@@ -98,15 +138,15 @@ class License_Settings extends Register_Settings {
 		if ($status === 'inactive' || $status === 'site_inactive') {
 			$output = sprintf(
 				'<input type="submit" name="activate_key" class="button-secondary" value="Activate Site" /><p style="color:#ffb900;">%s</p>',
-				$this->license_status_message[$status]
+				$this->get_option('message')
 			);
 		} elseif ($status === 'valid') {
 			$output = sprintf(
 				'<input type="submit" name="deactivate_key" class="button-secondary" value="Deactivate Site" /><p style="color:green;">%s</p>',
-				$this->license_status_message[$status]
+				$this->get_option('message')
 			);
 		} else {
-			$output = sprintf('<p style="color:red;">%s</p>', $this->license_status_message[$status]);
+			$output = sprintf('<p style="color:red;">%s</p>', $this->get_option('message'));
 		}
 
 		echo $output;
