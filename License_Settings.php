@@ -3,18 +3,15 @@
 namespace vnh;
 
 class License_Settings extends Register_Settings {
-	private $license;
-	public $license_status;
-	public $license_status_option_name;
+	public $args;
 	public $license_status_message;
 
-	public function __construct(License_Management $license) {
-		$this->license = $license;
-		$this->prefix = $license->args['slug'];
+	public function __construct($args) {
+		$this->args = $args;
+
+		$this->prefix = isset($args['theme_slug']) ? $args['theme_slug'] : basename($args['plugin_file'], '.php');
 		$this->option_name = 'license';
 
-		$this->license_status_option_name = $this->get_prefix() . '_license_status';
-		$this->license_status = get_option($this->license_status_option_name);
 		$this->license_status_message = [
 			'empty_key' => esc_html__('The entered license key is not valid.', 'vnh_textdomain'),
 			'invalid' => esc_html__('The entered license key is not valid.', 'vnh_textdomain'),
@@ -55,42 +52,38 @@ class License_Settings extends Register_Settings {
 
 	public function boot() {
 		parent::boot();
-		add_action('admin_init', [$this, 'license_activation']);
-	}
-
-	public function license_activation() {
-		if ((isset($_REQUEST['activate_key']) || isset($_REQUEST['deactivate_key'])) && check_admin_referer($this->nonce(), $this->nonce())) {
-			$this->manage_license_activation();
-		}
+		add_action('admin_init', [$this, 'manage_license_activation']);
 	}
 
 	public function manage_license_activation() {
-		$action = isset($_REQUEST['activate_key']) ? 'activate_license' : 'deactivate_license';
-
-		request($this->license->args['remote_api_url'], [
-			'body' => [
-				'edd_action' => $action,
-				'license' => $this->license->license_key,
-				'item_id' => $this->license->args['item_id'],
-				'url' => home_url('/'),
-			],
-		]);
+		if ((isset($_REQUEST['activate_key']) || isset($_REQUEST['deactivate_key'])) && check_admin_referer($this->nonce(), $this->nonce())) {
+			request($this->args['remote_api_url'], [
+				'body' => [
+					'edd_action' => isset($_REQUEST['activate_key']) ? 'activate_license' : 'deactivate_license',
+					'license' => $this->get_option('key'),
+					'item_id' => $this->args['item_id'],
+					'url' => home_url('/'),
+				],
+			]);
+		}
 	}
 
 	public function check_license() {
-		update_option($this->license_status_option_name, $this->get_license_status());
+		$options = $this->get_options();
+		$options['status'] = $this->get_license_status();
+		$this->update_option($options);
 	}
 
 	private function get_license_status() {
-		if (empty($this->license->license_key)) {
+		if (empty($this->get_option('key'))) {
 			return 'empty_key';
 		}
 
-		$license_data = request($this->license->args['remote_api_url'], [
+		$license_data = request($this->args['remote_api_url'], [
 			'body' => [
 				'edd_action' => 'check_license',
-				'license' => $this->license->license_key,
-				'item_id' => $this->license->args['item_id'],
+				'license' => $this->get_option('key'),
+				'item_id' => $this->args['item_id'],
 				'url' => home_url('/'),
 			],
 		]);
@@ -103,7 +96,7 @@ class License_Settings extends Register_Settings {
 	}
 
 	public function display_field_license_action($field, $option) {
-		$status = get_option($this->license_status_option_name);
+		$status = $this->get_option('status');
 
 		if ($status === 'inactive' || $status === 'site_inactive') {
 			$output = sprintf(
