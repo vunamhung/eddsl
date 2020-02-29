@@ -45,11 +45,6 @@ class License_Settings extends Register_Settings {
 		];
 	}
 
-	public function render() {
-		$this->check_license();
-		return parent::render();
-	}
-
 	public function boot() {
 		parent::boot();
 		add_action('admin_init', [$this, 'manage_license_activation']);
@@ -96,6 +91,8 @@ class License_Settings extends Register_Settings {
 	}
 
 	public function display_field_license_action($field, $option) {
+		$this->check_license();
+
 		$status = $this->get_option('status');
 
 		if ($status === 'inactive' || $status === 'site_inactive') {
