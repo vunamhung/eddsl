@@ -11,14 +11,12 @@ class License_Page implements Bootable {
 	public $page_title;
 	public $menu_title;
 
-	public function __construct($args, $settings) {
+	public function __construct($args, License_Settings $settings) {
 		$this->settings = $settings;
 		$this->parent_menu_slug = $args['parent_menu_slug'];
 		$this->menu_slug = $this->parent_menu_slug . '-license';
-		$this->page_title = isset($args['theme_slug'])
-			? esc_html__('Theme License', 'vnh_textdomain')
-			: esc_html__('Plugin License', 'vnh_textdomain');
-		$this->menu_title = $this->page_title;
+		$this->page_title = $args['menu_title'];
+		$this->menu_title = $args['menu_title'];
 	}
 
 	public function boot() {
