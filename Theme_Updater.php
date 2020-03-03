@@ -6,10 +6,12 @@ use vnh\contracts\Bootable;
 
 class Theme_Updater implements Bootable {
 	public $args;
+	public $settings;
 	private $response_key;
 
-	public function __construct($args) {
+	public function __construct($args, License_Settings $settings) {
 		$this->args = $args;
+		$this->settings = $settings;
 		$this->response_key = $args['theme_slug'] . '_update_response';
 	}
 
@@ -38,14 +40,14 @@ class Theme_Updater implements Bootable {
 		$update_data = get_transient($this->response_key);
 
 		if ($update_data === false) {
-			if (empty($this->args['license_key'])) {
+			if (empty($this->settings->get_option('key'))) {
 				return false;
 			}
 
 			$update_data = request($this->args['remote_api_url'], [
 				'body' => [
 					'edd_action' => 'get_version',
-					'license' => $this->args['license_key'],
+					'license' => $this->settings->get_option('key'),
 					'item_id' => $this->args['item_id'],
 				],
 			]);

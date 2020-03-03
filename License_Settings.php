@@ -5,10 +5,10 @@ namespace vnh;
 class License_Settings extends Register_Settings {
 	public $args;
 
-	public function __construct($args) {
+	public function __construct($args, $prefix) {
 		$this->args = $args;
 
-		$this->prefix = isset($args['theme_slug']) ? $args['theme_slug'] : basename($args['plugin_file'], '.php');
+		$this->prefix = $prefix;
 		$this->option_name = 'license';
 	}
 
@@ -59,7 +59,7 @@ class License_Settings extends Register_Settings {
 
 		if (empty($this->get_option('key'))) {
 			$options['message'] = esc_html__('Empty license.', 'vnh_textdomain');
-			$this->update_option($options);
+			$this->update_options($options);
 			return;
 		}
 
@@ -74,7 +74,7 @@ class License_Settings extends Register_Settings {
 
 		if (is_wp_error($license_data)) {
 			$options['message'] = esc_html__('An error occurred, please try again.', 'vnh_textdomain');
-			$this->update_option($options);
+			$this->update_options($options);
 			return;
 		}
 
@@ -120,7 +120,7 @@ class License_Settings extends Register_Settings {
 		}
 
 		$options['status'] = $license_data['license'];
-		$this->update_option($options);
+		$this->update_options($options);
 	}
 
 	public function get_renewal_link() {
